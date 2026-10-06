@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define cqsize_t size_t
-#include "../include/cqueue/cqueue.h"
+#include "cqueue/cqueue.h"
 
 typedef struct {
     int n;
