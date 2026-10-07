@@ -1,0 +1,388 @@
+# CQueue
+
+CQueue is a lightweight, platform-independent circular queue library written in C.
+
+It is designed to be portable across operating systems and embedded platforms, with no mandatory dependency on the C standard library. Memory allocation and memory operations can be provided by the application through a configurable platform API.
+
+## Features
+
+- Circular FIFO queue
+- Supports arbitrary fixed-size element types
+- Dynamically allocated or externally provided buffers
+- Configurable size/index type through `CQUEUE_SIZE_TYPE`
+- Optional platform-provided `malloc`, `free`, `memcpy`, and `memset`
+- No mandatory dependency on the C standard library
+- Suitable for Linux, embedded systems, and other platforms
+- Small and lightweight implementation
+
+## Project Structure
+
+```text
+.
+├── example
+│   └── main.c
+├── include
+│   └── cqueue
+│       └── cqueue.h
+├── src
+│   └── cqueue.c
+└── Makefile
+```
+
+## Installation
+
+CQueue can be built and installed using the provided Makefile.
+
+```bash
+make
+sudo make install
+```
+
+By default, the library is installed under:
+
+```text
+/usr/local/
+├── include/
+│   └── cqueue/
+│       └── cqueue.h
+└── lib/
+    └── libcqueue.a
+```
+
+After installation, applications can include the library with:
+
+```c
+#include <cqueue/cqueue.h>
+```
+
+and link against it using:
+
+```bash
+gcc main.c -lcqueue -o my_program
+```
+
+To uninstall:
+
+```bash
+sudo make uninstall
+```
+
+## Basic Usage
+
+A queue can store elements of any fixed size.
+
+For example, a queue containing four integers:
+
+```c
+#include <stdio.h>
+
+#include <cqueue/cqueue.h>
+
+int main(void)
+{
+    cqueue_t queue;
+
+    cqueue_err_t err = cqueue_init(
+        &queue,
+        sizeof(int),
+        4,
+        NULL
+    );
+
+    if (err != CQUEUE_OK) {
+        return 1;
+    }
+
+    int value = 42;
+
+    cqueue_insert(&queue, &value);
+
+    int result;
+
+    cqueue_remove(&queue, &result);
+
+    printf("Value: %d\n", result);
+
+    cqueue_end(&queue);
+
+    return 0;
+}
+```
+
+Compile with:
+
+```bash
+gcc main.c -lcqueue -o my_program
+```
+
+### Queue Capacity
+
+The third argument of `cqueue_init()` defines the maximum number of elements:
+
+```c
+cqueue_init(&queue, sizeof(int), 4, NULL);
+```
+
+This creates a queue capable of storing four `int` values.
+
+When the queue is full, `cqueue_insert()` returns:
+
+```c
+CQUEUE_ERR_FULL
+```
+
+When the queue is empty, `cqueue_remove()` returns:
+
+```c
+CQUEUE_ERR_EMPTY
+```
+
+The queue can also be queried directly:
+
+```c
+if (cqueue_is_empty(&queue)) {
+    /* Queue is empty */
+}
+
+if (cqueue_is_full(&queue)) {
+    /* Queue is full */
+}
+```
+
+## External Buffers
+
+CQueue does not require dynamic memory allocation.
+
+An application can provide its own buffer:
+
+```c
+int buffer[4];
+cqueue_t queue;
+
+cqueue_init(
+    &queue,
+    sizeof(int),
+    4,
+    buffer
+);
+```
+
+In this case, CQueue uses the supplied memory and does not free it when `cqueue_end()` is called.
+
+This is useful for embedded systems or applications where dynamic allocation is undesirable.
+
+## `CQUEUE_SIZE_TYPE`
+
+CQueue uses the `cqsize_t` type for sizes, counters, indexes, and buffer offsets.
+
+The type is configurable through the `CQUEUE_SIZE_TYPE` macro:
+
+```c
+#ifndef CQUEUE_SIZE_TYPE
+    #define CQUEUE_SIZE_TYPE unsigned int
+#endif
+
+typedef CQUEUE_SIZE_TYPE cqsize_t;
+```
+
+If the application does not define `CQUEUE_SIZE_TYPE`, CQueue uses:
+
+```c
+unsigned int
+```
+
+by default.
+
+For example:
+
+```c
+#include <cqueue/cqueue.h>
+```
+
+uses the default:
+
+```text
+cqsize_t = unsigned int
+```
+
+An application can override it before including the header:
+
+```c
+#define CQUEUE_SIZE_TYPE unsigned long
+
+#include <cqueue/cqueue.h>
+```
+
+This allows the application to choose an appropriate integer type for its target platform.
+
+### Why is this configurable?
+
+CQueue is intended to be platform-independent.
+
+Different platforms may have different requirements for the size of indexes and counters. An embedded system may prefer a smaller integer type, while a desktop application may want a larger type.
+
+For example:
+
+```c
+#define CQUEUE_SIZE_TYPE uint32_t
+
+#include <cqueue/cqueue.h>
+```
+
+The important requirement is that the same `CQUEUE_SIZE_TYPE` configuration must be used when compiling the CQueue library and when compiling applications that use it.
+
+When building CQueue with a custom type, it can also be supplied through the compiler:
+
+```bash
+gcc -DCQUEUE_SIZE_TYPE=uint32_t ...
+```
+
+This is particularly useful when integrating CQueue into a larger build system.
+
+## Platform Memory API
+
+CQueue does not require the application to use the standard C library's memory functions.
+
+The following operations can be provided through `cqueue_port()`:
+
+```c
+typedef struct {
+    void* (*memset)(void *s, int c, cqsize_t n);
+    void* (*memcpy)(void *dest, const void *src, cqsize_t n);
+    void* (*malloc)(cqsize_t size);
+    void  (*free)(void *ptr);
+} cqueue_port_api_t;
+```
+
+For example, on a standard Linux system:
+
+```c
+#include <stdlib.h>
+#include <string.h>
+
+cqueue_port_api_t port = {
+    .memset = memset,
+    .memcpy = memcpy,
+    .malloc = malloc,
+    .free   = free
+};
+
+cqueue_port(&port);
+```
+
+After this configuration, CQueue uses the supplied functions.
+
+If `memset` or `memcpy` are not provided, CQueue uses its own internal implementations.
+
+`malloc` and `free` must be provided as a pair. If only one of them is supplied, dynamic allocation is disabled.
+
+This allows CQueue to be integrated with custom allocators or platform-specific memory APIs.
+
+## Error Handling
+
+CQueue operations return a `cqueue_err_t` value:
+
+```c
+typedef enum {
+    CQUEUE_OK,
+    CQUEUE_ERR_INVALID_ARG,
+    CQUEUE_ERR_INVALID_STATE,
+    CQUEUE_ERR_MALLOC,
+    CQUEUE_ERR_FULL,
+    CQUEUE_ERR_EMPTY
+} cqueue_err_t;
+```
+
+A typical usage is:
+
+```c
+cqueue_err_t err = cqueue_insert(&queue, &value);
+
+if (err == CQUEUE_OK) {
+    /* Element inserted */
+}
+```
+
+## API Overview
+
+### Initialization
+
+```c
+cqueue_err_t cqueue_init(
+    cqueue_t *queue,
+    cqsize_t esz,
+    cqsize_t en,
+    void *buf
+);
+```
+
+Initializes a queue.
+
+- `queue` — queue instance
+- `esz` — size of each element
+- `en` — maximum number of elements
+- `buf` — optional external buffer; `NULL` enables dynamic allocation
+
+### Insert
+
+```c
+cqueue_err_t cqueue_insert(
+    cqueue_t *queue,
+    void *ein
+);
+```
+
+Inserts an element at the end of the queue.
+
+### Remove
+
+```c
+cqueue_err_t cqueue_remove(
+    cqueue_t *queue,
+    void *eout
+);
+```
+
+Removes the oldest element from the queue.
+
+### Empty Check
+
+```c
+CQueue_Bool cqueue_is_empty(
+    const cqueue_t *queue
+);
+```
+
+Returns `CQueue_True` when the queue contains no elements.
+
+### Full Check
+
+```c
+CQueue_Bool cqueue_is_full(
+    const cqueue_t *queue
+);
+```
+
+Returns `CQueue_True` when the queue has reached its capacity.
+
+### Cleanup
+
+```c
+cqueue_err_t cqueue_end(
+    cqueue_t *queue
+);
+```
+
+Releases resources owned by the queue and resets its state.
+
+## Thread Safety
+
+CQueue does not provide internal synchronization.
+
+Concurrent access from multiple threads or interrupt contexts must be synchronized by the application.
+
+The library is intentionally kept independent from threading primitives so that the application can provide the appropriate synchronization mechanism for its platform.
+
+## License
+
+See the repository license for the terms of use.

@@ -1,7 +1,3 @@
-#ifndef cqsize_t
-    #define cqsize_t unsigned int
-#endif
-
 #include "cqueue/cqueue.h"
 
 #define _port_fns cqueue_port_fns

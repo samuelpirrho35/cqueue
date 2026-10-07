@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define cqsize_t size_t
+#define CQUEUE_SIZE_TYPE size_t
 #include "cqueue/cqueue.h"
 
 typedef struct {

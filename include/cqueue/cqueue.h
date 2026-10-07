@@ -9,13 +9,9 @@
  * The queue does not require the C standard library. Memory and memory-copy
  * operations can be supplied by the application through @ref cqueue_port().
  *
- * The application must define the @c cqsize_t type before including this
- * header. For example:
- *
- * @code
- * #define cqsize_t size_t
- * #include "cqueue/cqueue.h"
- * @endcode
+ * The integer type used for queue sizes, counters, indexes, and offsets is
+ * configurable through @c CQUEUE_SIZE_TYPE. If not defined by the application,
+ * @c unsigned int is used by default.
  *
  * The queue can use either:
  *
@@ -31,20 +27,30 @@
 #define __cqueue_h__
 
 /**
- * @brief Size type used internally by cqueue.
+ * @brief Defines the integer type used for CQueue sizes and indexes.
  *
- * The application must define @c cqsize_t before including this header.
+ * Applications may override this macro before including the CQueue header
+ * to select a different integer type.
  *
- * Example:
+ * If not defined by the application, @c unsigned int is used by default.
  *
+ * @example
  * @code
- * #define cqsize_t size_t
+ * #define CQUEUE_SIZE_TYPE size_t
+ * #include <cqueue/cqueue.h>
  * @endcode
  */
-#ifndef cqsize_t
-    #error "cqsize_t must be defined by application. Example: #define cqsize_t size_t"
-    #define cqsize_t unsigned int
+#ifndef CQUEUE_SIZE_TYPE
+    #define CQUEUE_SIZE_TYPE unsigned int
 #endif
+
+/**
+ * @brief Integer type used for CQueue sizes and indexes.
+ *
+ * This type is derived from @ref CQUEUE_SIZE_TYPE and is used throughout
+ * the CQueue API for element counts, indexes, buffer sizes, and offsets.
+ */
+typedef CQUEUE_SIZE_TYPE cqsize_t;
 
 #ifndef NULL
     /**
